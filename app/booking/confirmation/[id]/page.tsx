@@ -1,3 +1,4 @@
+import { query } from "@/lib/db/neon"
 import { createClient } from "@/lib/supabase/server"
 import { notFound, redirect } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,14 +19,17 @@ export default async function BookingConfirmationPage({ params }: { params: Prom
     redirect("/auth/login")
   }
 
-  const { data: booking, error } = await supabase
-    .from("bookings")
-    .select("*, companions(*)")
-    .eq("id", id)
-    .eq("client_id", user.id)
-    .single()
+  const { data: bookings } = await query(
+    `SELECT b.*, c.* 
+     FROM bookings b
+     JOIN companions c ON b.companion_id = c.id
+     WHERE b.id = $1 AND b.client_id = $2`,
+    [id, user.id],
+  )
 
-  if (error || !booking) {
+  const booking = bookings?.[0]
+
+  if (!booking) {
     notFound()
   }
 
@@ -48,19 +52,19 @@ export default async function BookingConfirmationPage({ params }: { params: Prom
             <CardContent className="space-y-6">
               <div className="flex items-center gap-4 pb-4 border-b">
                 <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                  {booking.companions.avatar_url ? (
+                  {booking.avatar_url ? (
                     <img
-                      src={booking.companions.avatar_url || "/placeholder.svg"}
-                      alt={booking.companions.display_name}
+                      src={booking.avatar_url || "/placeholder.svg?height=64&width=64&query=companion avatar"}
+                      alt={booking.display_name}
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    <span className="text-2xl">{booking.companions.display_name[0]}</span>
+                    <span className="text-2xl">{booking.display_name[0]}</span>
                   )}
                 </div>
                 <div>
-                  <p className="font-semibold text-lg">{booking.companions.display_name}</p>
-                  <p className="text-sm text-muted-foreground">{booking.companions.location}</p>
+                  <p className="font-semibold text-lg">{booking.display_name}</p>
+                  <p className="text-sm text-muted-foreground">{booking.location}</p>
                 </div>
               </div>
 

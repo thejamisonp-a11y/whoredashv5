@@ -1,3 +1,4 @@
+import { query } from "@/lib/db/neon"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,7 +20,8 @@ export default async function CompanionDashboardPage() {
     redirect("/auth/login")
   }
 
-  const { data: companion } = await supabase.from("companions").select("*").eq("user_id", user.id).single()
+  const { data: companions } = await query("SELECT * FROM companions WHERE user_id = $1", [user.id])
+  const companion = companions?.[0]
 
   if (!companion) {
     return (
@@ -43,17 +45,20 @@ export default async function CompanionDashboardPage() {
     )
   }
 
-  const { data: bookings } = await supabase
-    .from("bookings")
-    .select("*, profiles(full_name, email)")
-    .eq("companion_id", companion.id)
-    .order("created_at", { ascending: false })
+  const { data: bookings } = await query(
+    `SELECT b.*, p.full_name, p.email 
+     FROM bookings b
+     LEFT JOIN profiles p ON b.client_id = p.id
+     WHERE b.companion_id = $1
+     ORDER BY b.created_at DESC`,
+    [companion.id],
+  )
 
-  const pendingBookings = bookings?.filter((b) => b.status === "pending") || []
-  const confirmedBookings = bookings?.filter((b) => b.status === "confirmed") || []
-  const completedBookings = bookings?.filter((b) => b.status === "completed") || []
+  const pendingBookings = bookings?.filter((b: any) => b.status === "pending") || []
+  const confirmedBookings = bookings?.filter((b: any) => b.status === "confirmed") || []
+  const completedBookings = bookings?.filter((b: any) => b.status === "completed") || []
 
-  const totalEarnings = completedBookings.reduce((sum, booking) => sum + booking.total_amount, 0)
+  const totalEarnings = completedBookings.reduce((sum: number, booking: any) => sum + booking.total_amount, 0)
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,7 +97,7 @@ export default async function CompanionDashboardPage() {
               <Star className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{companion.rating.toFixed(1)}</div>
+              <div className="text-2xl font-bold">{Number(companion.rating).toFixed(1)}</div>
               <p className="text-xs text-muted-foreground">{companion.total_reviews} reviews</p>
             </CardContent>
           </Card>

@@ -1,3 +1,4 @@
+import { query } from "@/lib/db/neon"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,19 +17,23 @@ export default async function DashboardPage() {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  const { data: profiles } = await query("SELECT * FROM profiles WHERE id = $1", [user.id])
+  const profile = profiles?.[0]
 
-  const { data: allBookings } = await supabase
-    .from("bookings")
-    .select("*, companions(*)")
-    .eq("client_id", user.id)
-    .order("created_at", { ascending: false })
+  const { data: allBookings } = await query(
+    `SELECT b.*, c.* 
+     FROM bookings b
+     JOIN companions c ON b.companion_id = c.id
+     WHERE b.client_id = $1
+     ORDER BY b.created_at DESC`,
+    [user.id],
+  )
 
-  const pendingBookings = allBookings?.filter((b) => b.status === "pending") || []
-  const confirmedBookings = allBookings?.filter((b) => b.status === "confirmed") || []
-  const completedBookings = allBookings?.filter((b) => b.status === "completed") || []
+  const pendingBookings = allBookings?.filter((b: any) => b.status === "pending") || []
+  const confirmedBookings = allBookings?.filter((b: any) => b.status === "confirmed") || []
+  const completedBookings = allBookings?.filter((b: any) => b.status === "completed") || []
 
-  const totalSpent = completedBookings.reduce((sum, booking) => sum + booking.total_amount, 0)
+  const totalSpent = completedBookings.reduce((sum: number, booking: any) => sum + booking.total_amount, 0)
 
   return (
     <div className="min-h-screen bg-background">

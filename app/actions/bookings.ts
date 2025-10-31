@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { query } from "@/lib/db/neon"
 
 interface CreateBookingParams {
   companionId: string
@@ -13,39 +13,41 @@ interface CreateBookingParams {
 }
 
 export async function createBooking(params: CreateBookingParams) {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from("bookings")
-    .insert({
-      companion_id: params.companionId,
-      client_id: params.clientId,
-      booking_date: params.bookingDate,
-      duration_hours: params.durationHours,
-      total_amount: params.totalAmount,
-      delivery_address: params.deliveryAddress,
-      special_requests: params.specialRequests,
-      status: "pending",
-    })
-    .select()
-    .single()
+  const { data, error } = await query(
+    `INSERT INTO bookings (
+      companion_id, client_id, booking_date, duration_hours, 
+      total_amount, delivery_address, special_requests, status
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING id`,
+    [
+      params.companionId,
+      params.clientId,
+      params.bookingDate,
+      params.durationHours,
+      params.totalAmount,
+      params.deliveryAddress,
+      params.specialRequests,
+      "pending",
+    ],
+  )
 
   if (error) {
     console.error("[v0] Error creating booking:", error)
-    return { error: error.message }
+    return { error: error.message || "Failed to create booking" }
   }
 
-  return { bookingId: data.id }
+  return { bookingId: data?.[0]?.id }
 }
 
 export async function updateBookingStatus(bookingId: string, status: string) {
-  const supabase = await createClient()
-
-  const { error } = await supabase.from("bookings").update({ status }).eq("id", bookingId)
+  const { error } = await query("UPDATE bookings SET status = $1, updated_at = NOW() WHERE id = $2", [
+    status,
+    bookingId,
+  ])
 
   if (error) {
     console.error("[v0] Error updating booking status:", error)
-    throw new Error(error.message)
+    throw new Error(error.message || "Failed to update booking status")
   }
 
   return { success: true }

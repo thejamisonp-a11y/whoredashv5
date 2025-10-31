@@ -1,3 +1,4 @@
+import { query } from "@/lib/db/neon"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { CompanionEditForm } from "@/components/companion-edit-form"
@@ -13,7 +14,8 @@ export default async function CompanionEditPage() {
     redirect("/auth/login")
   }
 
-  const { data: companion } = await supabase.from("companions").select("*").eq("user_id", user.id).single()
+  const { data: companions } = await query("SELECT * FROM companions WHERE user_id = $1", [user.id])
+  const companion = companions?.[0]
 
   if (!companion) {
     redirect("/companion-dashboard/setup")
